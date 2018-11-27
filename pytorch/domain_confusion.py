@@ -1,4 +1,4 @@
-mport torch
+import torch
 import numpy as np
 from torch.nn import functional as F
 
@@ -32,3 +32,17 @@ class DomainCNN(torch.nn.Module):
         m = torch.nn.Softmax(1)
         x = m(self.fc1(x))
         return x
+
+class DomainLoss(torch.nn.Module):
+    def __init__(self, num_classes):
+        super(DomainLoss, self).__init__()
+        self.num_classes = num_classes
+
+    def forward(self, outputs, targets):
+        """param outputs: k dimension outputs from confusion network """
+        # TODO FIX THIS HAHA
+        loss = torch.nn.CrossEntropyLoss(outputs, targets)
+        loss = loss.sum / loss.shape[1]
+
+
+
