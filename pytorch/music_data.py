@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import os
 import torch.utils.data
+import utils
 
 class MusicDataset(torch.utils.data.Dataset):
     """Music"""
@@ -32,6 +33,7 @@ class MusicDataset(torch.utils.data.Dataset):
                 X, sr = libr.load("{}\{}".format(root_dir, file), self.sr)
                 assert(sr == self.sr)
                 Y = libr.util.frame(X, self.sr * self.clip_length) # split into 1 second clips
+                Y = [self.augment_pitch(clip) for clip in Y]
                 data.append(Y)
                 print("successfully loaded {} {}-second ({} sample) clip(s) from {}".format(Y.shape[1], self.clip_length, self.clip_length * self.sr, file))
             except AssertionError as e:
@@ -54,15 +56,14 @@ class MusicDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.data.shape[0]
 
-    def __getitem__(self, idx):
+    def augment_pitch(self, clip):
+        """ Augment pitch and apply mu-law encoding to audio clip"""
         pitch = self.range * 2 * (np.random.random_sample() - 0.5) # how much to raise/lower by
         dur = (np.random.random_sample() / 4 + 0.25) * self.clip_length # duration of subsample between [0.25, .5]
         low = min(self.clip_length * np.random.random_sample(), self.clip_length - dur) # lower bound
-
-        clip = self.data[idx]
 
         a = int(self.sr * low)
         b = int(self.sr * dur) + a
 
         clip[a : b] = libr.effects.pitch_shift(clip[a : b], self.sr, n_steps = pitch) # may modify data matrix, not a huge deal
-        return torch.Tensor(clip)
+        return utils.mu_law_encode(clip / utils.MAX_WAV_VALUE) # apply mu law encoding
