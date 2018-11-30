@@ -30,7 +30,7 @@ class MusicDataset(torch.utils.data.Dataset):
                 continue
 
             try:
-                X, sr = libr.load("{}\{}".format(root_dir, file), self.sr)
+                X, sr = libr.load("{}/{}".format(root_dir, file), self.sr)
                 assert(sr == self.sr)
                 Y = libr.util.frame(X, self.sr * self.clip_length) # split into 1 second clips
                 Y = [self.augment_pitch(clip) for clip in Y]
