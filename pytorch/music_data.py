@@ -5,6 +5,28 @@ import os
 import torch.utils.data
 import utils
 
+def mu_law_encode(x, mu_quantization=256):
+    """ Numpy implementation of mu-law encoding"""
+    assert(x.max() <= 1.0)
+    assert(x.min() >= -1.0)
+    mu = mu_quantization - 1.
+    scaling = np.log1p(mu)
+    x_mu = np.sign(x) * np.log1p(mu * np.abs(x)) / scaling
+    encoding = ((x_mu + 1) / 2 * mu + 0.5).long()
+    return encoding
+  
+def mu_law_decode(x, mu_quantization=256):
+    """ Numpy implementation of mu-law decoding"""
+    assert(np.max(x) <= mu_quantization)
+    assert(np.min(x) >= 0)
+    x = x.float()
+    mu = mu_quantization - 1.
+    # Map values back to [-1, 1].
+    signal = 2 * (x / mu) - 1
+    # Perform inverse of mu-law transformation.
+    magnitude = (1 / mu) * ((1 + mu)**np.abs(signal) - 1)
+    return np.sign(signal) * magnitude
+  
 class MusicDataset(torch.utils.data.Dataset):
     """Music"""
 
@@ -33,13 +55,18 @@ class MusicDataset(torch.utils.data.Dataset):
                 X, sr = libr.load("{}/{}".format(root_dir, file), self.sr)
                 assert(sr == self.sr)
                 Y = libr.util.frame(X, self.sr * self.clip_length) # split into 1 second clips
-                Y = [self.augment_pitch(clip) for clip in Y]
+                # TODO may need to batch these, remove random later
+                Z = []
+                for clip in Y:
+                    Z.append(self.augment_pitch(clip))
+                    print(clip.shape)
+                Y = Z
                 data.append(Y)
-                print("successfully loaded {} {}-second ({} sample) clip(s) from {}".format(Y.shape[1], self.clip_length, self.clip_length * self.sr, file))
+                print("successfully loaded {} {}-second ({} sample) clip(s) from {}".format(len(Y), self.clip_length, self.clip_length * self.sr, file))
             except AssertionError as e:
                 print("unable to load {}".format(file))
-
-        self.data = np.concatenate(data, axis = 1).T
+        if len(data) > 1:
+          self.data = np.concatenate(data, axis = 1).T 
 
         # to speed this up, maybe something like this, i.e. augment first
 
@@ -66,4 +93,5 @@ class MusicDataset(torch.utils.data.Dataset):
         b = int(self.sr * dur) + a
 
         clip[a : b] = libr.effects.pitch_shift(clip[a : b], self.sr, n_steps = pitch) # may modify data matrix, not a huge deal
-        return utils.mu_law_encode(clip / utils.MAX_WAV_VALUE) # apply mu law encoding
+        clip = torch.Tensor(clip)
+        return mu_law_encode(clip / utils.MAX_WAV_VALUE) # apply mu law encoding
