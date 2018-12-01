@@ -1,7 +1,9 @@
+
 import librosa as libr
 import numpy as np
 import torch
 import os
+# os.chdir('artistic-music-style-transfer/pytorch')
 import torch.utils.data
 import utils
 
@@ -59,7 +61,6 @@ class MusicDataset(torch.utils.data.Dataset):
                 Z = []
                 for clip in Y:
                     Z.append(self.augment_pitch(clip))
-                    print(clip.shape)
                 Y = Z
                 data.append(Y)
                 print("successfully loaded {} {}-second ({} sample) clip(s) from {}".format(len(Y), self.clip_length, self.clip_length * self.sr, file))
@@ -88,10 +89,9 @@ class MusicDataset(torch.utils.data.Dataset):
         pitch = self.range * 2 * (np.random.random_sample() - 0.5) # how much to raise/lower by
         dur = (np.random.random_sample() / 4 + 0.25) * self.clip_length # duration of subsample between [0.25, .5]
         low = min(self.clip_length * np.random.random_sample(), self.clip_length - dur) # lower bound
-
-        a = int(self.sr * low)
-        b = int(self.sr * dur) + a
-
+        a = int(clip.shape[0] * low) 
+        b = (int(clip.shape[0] * dur) + a)
         clip[a : b] = libr.effects.pitch_shift(clip[a : b], self.sr, n_steps = pitch) # may modify data matrix, not a huge deal
+        
         clip = torch.Tensor(clip)
         return mu_law_encode(clip / utils.MAX_WAV_VALUE) # apply mu law encoding
